@@ -1,0 +1,124 @@
+<script src="/socket.io/socket.io.js"></script>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="lg:col-span-2 rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl overflow-hidden">
+    <div class="p-5 border-b border-white/10 flex items-center justify-between gap-3 flex-wrap">
+      <div>
+        <div class="text-xs text-slate-400 uppercase tracking-wider">Team Chat</div>
+        <div class="text-xl font-semibold tracking-tight mt-1">Rooms for your role</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="room" class="rounded-2xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-400">
+          {{ROOM_OPTIONS}}
+        </select>
+        <button id="join" class="rounded-2xl bg-white/10 hover:bg-white/15 px-4 py-2 text-sm ring-1 ring-white/10 transition" type="button">
+          Join
+        </button>
+      </div>
+    </div>
+
+    <div id="feed" class="p-5 space-y-3 max-h-[520px] overflow-auto"></div>
+
+    <div class="p-5 border-t border-white/10 flex gap-2">
+      <input id="text" class="flex-1 rounded-2xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2.5 outline-none focus:ring-2 focus:ring-fuchsia-400" placeholder="Type a message…" />
+      <button id="send" class="rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-slate-950 font-semibold px-5 py-2.5 shadow-lg hover:opacity-95 transition" type="button">
+        Send
+      </button>
+    </div>
+  </div>
+
+  <div class="rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl p-6">
+    <div class="text-lg font-semibold tracking-tight">Available rooms</div>
+    <div class="mt-4 space-y-2" id="roomList">
+      {{ROOM_LIST}}
+    </div>
+    <div class="mt-4 text-xs text-slate-400">Rooms are locked by role. Admin can change locks in Admin Panel.</div>
+  </div>
+</div>
+
+<script>
+  const socket = io();
+  let currentRoom = "{{FIRST_ROOM}}";
+
+  const roomSel = document.getElementById("room");
+  const joinBtn = document.getElementById("join");
+  const sendBtn = document.getElementById("send");
+  const textEl = document.getElementById("text");
+  const feed = document.getElementById("feed");
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function addSystem(text) {
+    const el = document.createElement("div");
+    el.className = "text-xs text-slate-400";
+    el.textContent = "🟣 " + text;
+    feed.appendChild(el);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function addMessage(msg) {
+    const name = escapeHtml(msg.from.display_name);
+    const role = escapeHtml(msg.from.role);
+    const text = escapeHtml(msg.text);
+    const time = new Date(msg.at).toLocaleTimeString();
+
+    const wrap = document.createElement("div");
+    wrap.className = "rounded-3xl bg-white/5 ring-1 ring-white/10 p-4";
+    wrap.innerHTML = `
+      <div class="flex items-center justify-between gap-3">
+        <div class="text-sm font-medium">${name} <span class="text-xs text-slate-400">(${role})</span></div>
+        <div class="text-xs text-slate-400">${time}</div>
+      </div>
+      <div class="text-sm text-slate-200 mt-1 whitespace-pre-wrap">${text}</div>
+    `;
+    feed.appendChild(wrap);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function joinRoom(roomId) {
+    if (!roomId) return;
+    currentRoom = roomId;
+    feed.innerHTML = "";
+    socket.emit("join", roomId);
+  }
+
+  joinBtn.addEventListener("click", () => joinRoom(roomSel.value));
+
+  function send() {
+    const text = textEl.value.trim();
+    if (!text || !currentRoom) return;
+    socket.emit("message", { roomId: currentRoom, text });
+    textEl.value = "";
+    textEl.focus();
+  }
+  sendBtn.addEventListener("click", send);
+  textEl.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+
+  socket.on("connect", () => addSystem("Connected"));
+  socket.on("rooms", (rooms) => {
+    if (!rooms?.length) {
+      addSystem("No rooms available for your role.");
+      return;
+    }
+    const allowedIds = new Set(rooms.map(r => r.id));
+    if (!allowedIds.has(currentRoom)) currentRoom = rooms[0].id;
+    roomSel.value = currentRoom;
+    joinRoom(currentRoom);
+  });
+  socket.on("system", (msg) => addSystem(msg.message));
+  socket.on("message", (msg) => { if (msg.roomId === currentRoom) addMessage(msg); });
+
+  if (currentRoom) {
+    roomSel.value = currentRoom;
+    joinRoom(currentRoom);
+  } else {
+    addSystem("No rooms assigned.");
+  }
+</script>

@@ -1,0 +1,326 @@
+
+<div class="flex items-end justify-between gap-4 flex-wrap">
+  <div>
+    <h1 class="text-3xl font-semibold tracking-tight">Admin Panel</h1>
+    <p class="text-slate-300 mt-1">User management, app permissions, and chat room locks.</p>
+  </div>
+  <div class="text-xs text-slate-300 rounded-xl bg-white/5 ring-1 ring-white/10 px-3 py-2">
+    Saves instantly • refresh to see updates
+  </div>
+</div>
+
+<div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Create User -->
+  <div class="rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl p-5">
+    <div class="text-lg font-semibold tracking-tight">Create user</div>
+    <div class="mt-3 space-y-2">
+      <div>
+        <label class="text-xs text-slate-300">Username</label>
+        <input id="cu_username" placeholder="e.g. jane.smith" class="mt-1 w-full rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-cyan-400" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-300">Display name</label>
+        <input id="cu_display" placeholder="Jane Smith" class="mt-1 w-full rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-cyan-400" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-300">Role</label>
+        <select id="cu_role" class="mt-1 w-full rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-cyan-400"></select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-300">Temporary password</label>
+        <input id="cu_password" type="password" placeholder="Temp password" class="mt-1 w-full rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-fuchsia-400" />
+      </div>
+      <button id="createUser" class="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-slate-950 font-semibold py-2.5 shadow-lg hover:opacity-95 transition" type="button">
+        Create
+      </button>
+      <div id="cu_msg" class="text-sm text-rose-300"></div>
+      <div class="text-[11px] text-slate-400 mt-1">Username: 3–32 chars (a-z 0-9 . _ -)</div>
+    </div>
+  </div>
+
+  <!-- Users list -->
+  <div class="lg:col-span-2 rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl overflow-hidden">
+    <div class="p-4 border-b border-white/10 flex items-center justify-between gap-4 flex-wrap">
+      <div class="text-sm text-slate-300">Users</div>
+      <div class="text-xs text-slate-400">Reset password = set temp password.</div>
+    </div>
+    <div id="users" class="p-4 space-y-3 max-h-[420px] overflow-auto"></div>
+  </div>
+</div>
+
+<div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Apps -->
+  <div class="rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl overflow-hidden">
+    <div class="p-4 border-b border-white/10 text-sm text-slate-300">Apps</div>
+    <div id="apps" class="p-4 space-y-3"></div>
+  </div>
+
+  <!-- App permissions -->
+  <div class="lg:col-span-2 rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl overflow-hidden">
+    <div class="p-4 border-b border-white/10 flex items-center justify-between gap-4 flex-wrap">
+      <div class="text-sm text-slate-300">App permissions (by role)</div>
+      <div class="text-xs text-slate-400">Toggle to grant/revoke app access.</div>
+    </div>
+    <div class="p-4 overflow-auto">
+      <div id="permMatrix" class="min-w-[900px]"></div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4 grid grid-cols-1 lg:grid-cols-1 gap-4">
+  <div class="rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl overflow-hidden">
+    <div class="p-4 border-b border-white/10 flex items-center justify-between gap-4 flex-wrap">
+      <div class="text-sm text-slate-300">Chat room locks (by role)</div>
+      <div class="text-xs text-slate-400">Controls which roles can join each room.</div>
+    </div>
+    <div class="p-4 overflow-auto">
+      <div id="roomMatrix" class="min-w-[900px]"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const USERS = JSON.parse('{{USERS_JSON}}'.replaceAll("&quot;", '"'));
+  const APPS = JSON.parse('{{APPS_JSON}}'.replaceAll("&quot;", '"'));
+  const PERMS = JSON.parse('{{PERMS_JSON}}'.replaceAll("&quot;", '"'));
+  const ROLES = JSON.parse('{{ROLES_JSON}}'.replaceAll("&quot;", '"'));
+  const ROOMS = JSON.parse('{{ROOMS_JSON}}'.replaceAll("&quot;", '"'));
+  const ROOMROLES = JSON.parse('{{ROOMROLES_JSON}}'.replaceAll("&quot;", '"'));
+
+  const permSet = new Set(PERMS.map(p => `${p.app_key}|||${p.role}`));
+  const roomRoleSet = new Set(ROOMROLES.map(x => `${x.room_id}|||${x.role}`));
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function toast(msg, ok=true) {
+    const el = document.createElement("div");
+    el.className = `fixed bottom-4 right-4 z-50 rounded-2xl px-4 py-3 text-sm shadow-2xl ring-1 ${ok ? "bg-emerald-400/15 text-emerald-200 ring-emerald-400/30" : "bg-rose-400/15 text-rose-200 ring-rose-400/30"}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+
+  async function post(url, body) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
+  // Role dropdown
+  const roleSel = document.getElementById("cu_role");
+  roleSel.innerHTML = ROLES.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+
+  // Create user
+  document.getElementById("createUser").addEventListener("click", async () => {
+    const username = document.getElementById("cu_username").value.trim();
+    const display_name = document.getElementById("cu_display").value.trim();
+    const role = document.getElementById("cu_role").value;
+    const password = document.getElementById("cu_password").value;
+    const msg = document.getElementById("cu_msg");
+    msg.textContent = "";
+    try {
+      await post("/admin/users/create", { username, display_name, role, password });
+      toast("User created. Refresh to see it.");
+      document.getElementById("cu_username").value = "";
+      document.getElementById("cu_display").value = "";
+      document.getElementById("cu_password").value = "";
+    } catch (e) {
+      msg.textContent = e.message;
+      toast(e.message, false);
+    }
+  });
+
+  // Users list render
+  const usersEl = document.getElementById("users");
+  usersEl.innerHTML = USERS.map(u => `
+    <div class="rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div class="font-semibold">${escapeHtml(u.display_name)} <span class="text-xs text-slate-400">@${escapeHtml(u.username)}</span></div>
+          <div class="text-sm text-slate-300">Role: <span class="text-slate-100">${escapeHtml(u.role)}</span> • Status: <span class="${u.is_active ? "text-emerald-200" : "text-rose-200"}">${u.is_active ? "Active" : "Inactive"}</span></div>
+          <div class="text-xs text-slate-400 mt-1">Created: ${escapeHtml(u.created_at || "")} • ID: ${u.id}</div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <select data-role="${u.id}" class="rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-400">
+            ${ROLES.map(r => `<option value="${escapeHtml(r)}" ${r===u.role ? "selected":""}>${escapeHtml(r)}</option>`).join("")}
+          </select>
+          <input data-name="${u.id}" value="${escapeHtml(u.display_name)}" class="rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-400" />
+          <button data-save="${u.id}" class="rounded-xl bg-white/10 hover:bg-white/15 px-3 py-2 text-sm ring-1 ring-white/10 transition" type="button">Save</button>
+
+          <button data-toggle="${u.id}" data-active="${u.is_active}" class="rounded-xl ${u.is_active ? "bg-rose-400/15 text-rose-200 ring-rose-400/30" : "bg-emerald-400/15 text-emerald-200 ring-emerald-400/30"} hover:opacity-90 px-3 py-2 text-sm ring-1 transition" type="button">
+            ${u.is_active ? "Deactivate" : "Activate"}
+          </button>
+
+          <button data-reset="${u.id}" class="rounded-xl bg-white/10 hover:bg-white/15 px-3 py-2 text-sm ring-1 ring-white/10 transition" type="button">Reset password</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  usersEl.addEventListener("click", async (e) => {
+    const saveId = e.target?.getAttribute?.("data-save");
+    const toggleId = e.target?.getAttribute?.("data-toggle");
+    const resetId = e.target?.getAttribute?.("data-reset");
+
+    if (saveId) {
+      const role = usersEl.querySelector(`select[data-role="${saveId}"]`).value;
+      const display_name = usersEl.querySelector(`input[data-name="${saveId}"]`).value.trim();
+      try {
+        await post("/admin/users/update", { id: saveId, display_name, role });
+        toast("Saved. Refresh to see changes.");
+      } catch (err) {
+        toast(err.message, false);
+      }
+    }
+
+    if (toggleId) {
+      const cur = Number(e.target.getAttribute("data-active")) ? 1 : 0;
+      const next = cur ? 0 : 1;
+      try {
+        await post("/admin/users/toggle", { id: toggleId, is_active: next });
+        toast("Updated. Refresh to see new status.");
+      } catch (err) {
+        toast(err.message, false);
+      }
+    }
+
+    if (resetId) {
+      const pw = prompt("Enter a new temporary password:");
+      if (!pw) return;
+      try {
+        await post("/admin/users/reset_password", { id: resetId, password: pw });
+        toast("Password reset.");
+      } catch (err) {
+        toast(err.message, false);
+      }
+    }
+  });
+
+  // Apps render
+  const appsEl = document.getElementById("apps");
+  appsEl.innerHTML = APPS.map(a => `
+    <div class="rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="font-semibold">${escapeHtml(a.name)} <span class="text-xs text-slate-400">(${escapeHtml(a.key)})</span></div>
+          <div class="text-sm text-slate-300 mt-1">${escapeHtml(a.description)}</div>
+        </div>
+        <div class="text-xs rounded-full bg-white/10 ring-1 ring-white/10 px-3 py-1">${escapeHtml(a.badge || "")}</div>
+      </div>
+
+      <div class="mt-3 flex items-center gap-2">
+        <label class="text-xs text-slate-300">Sort</label>
+        <input data-sort="${escapeHtml(a.key)}" type="number" value="${a.sort_order}" class="w-20 rounded-xl bg-slate-900/60 ring-1 ring-white/10 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-cyan-400" />
+        <label class="ml-2 text-xs text-slate-300">Enabled</label>
+        <input data-enabled="${escapeHtml(a.key)}" type="checkbox" ${a.is_enabled ? "checked" : ""} />
+        <button data-appsave="${escapeHtml(a.key)}" class="ml-auto rounded-xl bg-white/10 hover:bg-white/15 px-3 py-2 text-sm ring-1 ring-white/10 transition" type="button">Save</button>
+      </div>
+    </div>
+  `).join("");
+
+  appsEl.addEventListener("click", async (e) => {
+    const key = e.target?.getAttribute?.("data-appsave");
+    if (!key) return;
+    const sort_order = Number(appsEl.querySelector(`input[data-sort="${CSS.escape(key)}"]`).value || 100);
+    const is_enabled = appsEl.querySelector(`input[data-enabled="${CSS.escape(key)}"]`).checked ? 1 : 0;
+    try {
+      await post("/admin/apps/update", { key, sort_order, is_enabled });
+      toast("App updated. Refresh dashboard to see changes.");
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+
+  // Permissions matrix
+  const permMatrix = document.getElementById("permMatrix");
+  permMatrix.innerHTML = `
+    <div class="grid" style="grid-template-columns: 240px repeat(${APPS.length}, minmax(130px, 1fr)); gap: 8px;">
+      <div class="text-xs text-slate-400 px-2 py-1">Role</div>
+      ${APPS.map(a => `<div class="text-xs text-slate-400 px-2 py-1">${escapeHtml(a.key)}</div>`).join("")}
+    </div>
+    <div class="h-px bg-white/10 my-3"></div>
+    ${ROLES.map(role => `
+      <div class="grid items-center" style="grid-template-columns: 240px repeat(${APPS.length}, minmax(130px, 1fr)); gap: 8px; margin-bottom: 10px;">
+        <div class="text-sm font-medium">${escapeHtml(role)}</div>
+        ${APPS.map(a => {
+          const k = `${a.key}|||${role}`;
+          const checked = permSet.has(k) ? "checked" : "";
+          return `
+            <label class="rounded-2xl bg-white/5 ring-1 ring-white/10 px-3 py-2 flex items-center justify-between gap-2">
+              <span class="text-xs text-slate-300">${escapeHtml(a.name)}</span>
+              <input type="checkbox" data-perm="1" data-app="${escapeHtml(a.key)}" data-role="${escapeHtml(role)}" ${checked} />
+            </label>
+          `;
+        }).join("")}
+      </div>
+    `).join("")}
+  `;
+
+  permMatrix.addEventListener("change", async (e) => {
+    const t = e.target;
+    if (!t || t.getAttribute("data-perm") !== "1") return;
+    const app_key = t.getAttribute("data-app");
+    const role = t.getAttribute("data-role");
+    const allowed = t.checked ? 1 : 0;
+    try {
+      await post("/admin/perms/set", { app_key, role, allowed });
+      toast(`${allowed ? "Granted" : "Revoked"} ${app_key} for ${role}`);
+    } catch (err) {
+      toast(err.message, false);
+      t.checked = !t.checked;
+    }
+  });
+
+  // Chat room locks matrix
+  const roomMatrix = document.getElementById("roomMatrix");
+  roomMatrix.innerHTML = `
+    <div class="grid" style="grid-template-columns: 240px repeat(${ROOMS.length}, minmax(130px, 1fr)); gap: 8px;">
+      <div class="text-xs text-slate-400 px-2 py-1">Role</div>
+      ${ROOMS.map(r => `<div class="text-xs text-slate-400 px-2 py-1">${escapeHtml(r.id)}</div>`).join("")}
+    </div>
+    <div class="h-px bg-white/10 my-3"></div>
+    ${ROLES.map(role => `
+      <div class="grid items-center" style="grid-template-columns: 240px repeat(${ROOMS.length}, minmax(130px, 1fr)); gap: 8px; margin-bottom: 10px;">
+        <div class="text-sm font-medium">${escapeHtml(role)}</div>
+        ${ROOMS.map(r => {
+          const k = `${r.id}|||${role}`;
+          const checked = roomRoleSet.has(k) ? "checked" : "";
+          return `
+            <label class="rounded-2xl bg-white/5 ring-1 ring-white/10 px-3 py-2 flex items-center justify-between gap-2">
+              <span class="text-xs text-slate-300">${escapeHtml(r.name)}</span>
+              <input type="checkbox" data-roomperm="1" data-room="${escapeHtml(r.id)}" data-role="${escapeHtml(role)}" ${checked} />
+            </label>
+          `;
+        }).join("")}
+      </div>
+    `).join("")}
+  `;
+
+  roomMatrix.addEventListener("change", async (e) => {
+    const t = e.target;
+    if (!t || t.getAttribute("data-roomperm") !== "1") return;
+    const room_id = t.getAttribute("data-room");
+    const role = t.getAttribute("data-role");
+    const allowed = t.checked ? 1 : 0;
+    try {
+      await post("/admin/chat/roomrole", { room_id, role, allowed });
+      toast(`${allowed ? "Allowed" : "Blocked"} ${role} for ${room_id}`);
+    } catch (err) {
+      toast(err.message, false);
+      t.checked = !t.checked;
+    }
+  });
+</script>

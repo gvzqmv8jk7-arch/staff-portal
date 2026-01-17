@@ -1,0 +1,52 @@
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="md:col-span-2 rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl p-6">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-3xl font-semibold tracking-tight">Welcome back</h1>
+        <p class="text-slate-300 mt-1">Here are the apps you can access right now.</p>
+      </div>
+      <div class="rounded-2xl bg-slate-950/40 ring-1 ring-white/10 px-4 py-2 text-sm text-slate-300">
+        Role-based access is enforced
+      </div>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {{APP_CARDS}}
+    </div>
+  </div>
+
+  <div class="rounded-3xl bg-white/5 ring-1 ring-white/10 shadow-2xl p-6">
+    <div class="text-lg font-semibold tracking-tight">Quick actions</div>
+    <div class="mt-4 space-y-3">
+      <a href="/chat" class="block rounded-2xl bg-white/10 hover:bg-white/15 ring-1 ring-white/10 px-4 py-3 transition">
+        <div class="flex items-center justify-between">
+          <div class="font-medium">Open Team Chat</div>
+          <div>💬</div>
+        </div>
+        <div class="text-sm text-slate-300 mt-1">Join your role-based rooms.</div>
+      </a>
+
+      <a href="/editor" class="block rounded-2xl bg-white/10 hover:bg-white/15 ring-1 ring-white/10 px-4 py-3 transition">
+        <div class="flex items-center justify-between">
+          <div class="font-medium">Create a document</div>
+          <div>📝</div>
+        </div>
+        <div class="text-sm text-slate-300 mt-1">Word-like editor with autosave.</div>
+      </a>
+
+      <a href="/directory" class="block rounded-2xl bg-white/10 hover:bg-white/15 ring-1 ring-white/10 px-4 py-3 transition">
+        <div class="flex items-center justify-between">
+          <div class="font-medium">Find a colleague</div>
+          <div>👥</div>
+        </div>
+        <div class="text-sm text-slate-300 mt-1">Search by name, username, or role.</div>
+      </a>
+
+      <div class="rounded-2xl bg-slate-950/40 ring-1 ring-white/10 p-4 text-sm text-slate-300">
+        <div class="font-medium">Security</div>
+        <div class="mt-1 text-slate-400">Change seeded passwords after first run. Consider HTTPS + 2FA for production.</div>
+      </div>
+    </div>
+  </div>
+</div>
